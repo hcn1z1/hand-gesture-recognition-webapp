@@ -1,0 +1,17 @@
+models/*
+test/*.mp4
+test/test.mp4
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+*.jpg
+test/*.png
+test/*.jpg
+*/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+*.db

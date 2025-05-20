@@ -1,0 +1,9 @@
+django
+djangorestframework
+requests
+django-cors-headers
+channels
+pytorch
+mediapipe
+numpy
+opencv-python

@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MotionSpeak - Gesture Detection</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Montserrat:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --background: #121212;
+      --surface: #1A1A1A;
+      --surface-light: #252525;
+      --border: #2C2C2C;
+      --text-primary: #EEEEEE;
+      --text-secondary: #AAAAAA;
+      --accent: #1ABC9C;
+      --accent-light: rgba(26, 188, 156, 0.1);
+      --shadow: 0px 4px 12px rgba(0, 0, 0, 0.5);
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 24px;
+      --spacing-sm: 8px;
+      --spacing-md: 16px;
+      --spacing-lg: 24px;
+      --sidebar-width: 300px;
+      --history-width: 250px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: var(--background);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: var(--spacing-md);
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      position: relative;
+    }
+
+    /* Header Styles */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing-md) 0;
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .logo {
+      font-family: 'Montserrat', sans-serif;
+      font-weight: 600;
+      font-size: 24px;
+      color: #FFFFFF;
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+
+    .logo-icon {
+      margin-right: 5px;
+    }
+
+    .header-icons {
+      display: flex;
+      gap: var(--spacing-md);
+    }
+
+    .icon-btn {
+      background: var(--surface);
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .icon-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .icon-btn.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* Main Content Styles */
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-grow: 1;
+      position: relative;
+      padding-right: 0; /* No padding on right to allow sidebar to sit flush */
+    }
+
+    .video-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--spacing-lg);
+      width: 100%;
+      max-width: 640px; /* Match the video width */
+    }
+
+    .video-container {
+      position: relative;
+      width: 640px;
+      max-width: 100%;
+      margin: 0 auto;
+      background-color: var(--surface);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+
+    .video-placeholder {
+      position: relative;
+      width: 100%;
+      padding-top: 75%; /* 4:3 Aspect Ratio (4/3 = 75%) */
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .placeholder-content {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+    }
+
+    .placeholder-icon {
+      font-size: 48px;
+      margin-bottom: var(--spacing-md);
+    }
+
+    .video-active {
+      border-style: solid;
+    }
+
+    /* Button container */
+    .controls-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px; /* Fixed spacing between button and emoji display */
+      width: 100%;
+      max-width: 400px;
+    }
+
+    /* Emoji Display Box */
+    .emoji-display {
+      background-color: var(--surface);
+      border-radius: var(--radius-lg); /* Match the button's radius */
+      width: 75%; /* 75% of button width */
+      height: 96px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .emoji-display.active {
+      box-shadow: 0 0 10px rgba(26, 188, 156, 0.5);
+    }
+
+    .emoji-placeholder {
+      color: var(--text-secondary);
+      font-size: 12px;
+      text-align: center;
+      padding: 8px;
+    }
+
+    .emoji-icon {
+      width: 60px;
+      height: 60px;
+      background-color: var(--background);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 30px;
+      margin-bottom: 5px;
+    }
+
+    .emoji-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Gesture History Panel */
+    .history-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100%;
+      width: var(--history-width);
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      z-index: 100;
+      padding-top: var(--spacing-md);
+      padding-bottom: var(--spacing-md);
+    }
+
+    .history-panel.open {
+      transform: translateX(0);
+    }
+
+    .history-sidebar {
+      background-color: var(--surface);
+      border-radius: 0 var(--radius-md) var(--radius-md) 0;
+      height: 100%;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .history-toggle {
+      position: absolute;
+      right: -20px; /* Position the toggle button overlapping the panel's right edge */
+      top: 50%;
+      transform: translateY(-50%);
+      width: 40px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--surface);
+      border: none;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      color: var(--text-primary);
+      cursor: pointer;
+      z-index: 101;
+    }
+
+    .history-header {
+      padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-md);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .history-title {
+      font-weight: 700;
+      font-size: 16px;
+      text-align: center;
+    }
+
+    .history-content {
+      padding: 0;
+      height: calc(100% - 60px);
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) var(--surface);
+    }
+
+    .history-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .history-content::-webkit-scrollbar-track {
+      background: var(--surface);
+    }
+
+    .history-content::-webkit-scrollbar-thumb {
+      background-color: var(--border);
+      border-radius: 4px;
+      border: 2px solid var(--surface);
+    }
+
+    .history-list {
+      list-style: none;
+    }
+
+    .history-item {
+      display: flex;
+      padding: var(--spacing-sm) var(--spacing-md);
+      border-bottom: 1px solid var(--border);
+      transition: background-color 0.2s ease;
+    }
+
+    .history-item:hover {
+      background-color: var(--surface-light);
+    }
+
+    .history-item:last-child {
+      border-bottom: none;
+    }
+
+    .history-item.highlight {
+      background-color: var(--accent-light);
+    }
+
+    .history-icon {
+      width: 24px;
+      height: 24px;
+      background-color: var(--background);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+      font-size: 12px;
+      margin-right: var(--spacing-sm);
+      flex-shrink: 0;
+    }
+
+    .history-info {
+      flex-grow: 1;
+    }
+
+    .history-gesture {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .history-time {
+      font-size: 10px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .history-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-secondary);
+      font-size: 12px;
+      text-align: center;
+      padding: var(--spacing-md);
+    }
+
+    /* Button Styles */
+    .action-btn {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-md) var(--spacing-lg);
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      width: 100%;
+      cursor: pointer;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease;
+    }
+
+    .action-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .action-btn:active {
+      transform: scale(0.98);
+    }
+
+    /* Ripple Effect */
+    .ripple {
+      position: absolute;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.3);
+      transform: scale(0);
+      animation: ripple 0.6s linear;
+    }
+
+    @keyframes ripple {
+      to {
+        transform: scale(4);
+        opacity: 0;
+      }
+    }
+
+    /* Legend Box Styles */
+    .legend-box {
+      position: absolute;
+      bottom: var(--spacing-md);
+      right: var(--spacing-md);
+      background-color: rgba(0, 0, 0, 0.6);
+      padding: var(--spacing-md);
+      border-radius: var(--radius-sm);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 10;
+    }
+
+    .legend-box.active {
+      opacity: 1;
+    }
+
+    .legend-item {
+      display: flex;
+      margin-bottom: var(--spacing-sm);
+      align-items: center;
+    }
+
+    .legend-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .legend-label {
+      font-weight: 700;
+      font-size: 12px;
+      margin-right: var(--spacing-sm);
+      min-width: 100px;
+    }
+
+    .legend-value {
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
+    .info-icon {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      position: relative;
+    }
+
+    .tooltip {
+      position: absolute;
+      right: 100%;
+      top: 50%;
+      transform: translateY(-50%);
+      background-color: var(--surface);
+      padding: var(--spacing-sm);
+      border-radius: var(--radius-sm);
+      font-size: 10px;
+      width: 150px;
+      margin-right: var(--spacing-sm);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      z-index: 20;
+    }
+
+    .info-icon:hover .tooltip {
+      opacity: 1;
+    }
+
+    /* Sidebar Styles */
+    .sidebar-container {
+      position: fixed;
+      top: 0;
+      right: 0;
+      height: 100%;
+      width: var(--sidebar-width);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 100;
+      padding-top: var(--spacing-md);
+      padding-bottom: var(--spacing-md);
+    }
+
+    .sidebar-container.open {
+      transform: translateX(0);
+    }
+
+    .sidebar {
+      background-color: var(--surface);
+      border-radius: var(--radius-md) 0 0 var(--radius-md);
+      height: 100%;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .sidebar-toggle {
+      position: absolute;
+      left: -20px; /* Position the toggle button overlapping the sidebar's left edge */
+      top: 50%;
+      transform: translateY(-50%);
+      width: 40px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--surface);
+      border: none;
+      border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+      color: var(--text-primary);
+      cursor: pointer;
+      z-index: 101;
+    }
+
+    .sidebar-content {
+      padding: var(--spacing-lg);
+      height: 100%;
+      overflow-y: auto;
+    }
+
+    .sidebar-header {
+      font-weight: 700;
+      font-size: 16px;
+      margin-bottom: var(--spacing-lg);
+      text-align: center;
+    }
+
+    .gesture-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--spacing-md);
+    }
+
+    .gesture-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+
+    .gesture-item:hover {
+      transform: scale(1.05);
+    }
+
+    .gesture-icon {
+      width: 40px;
+      height: 40px;
+      background-color: var(--background);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--spacing-sm);
+      color: var(--accent);
+      font-size: 18px;
+    }
+
+    .gesture-label {
+      font-size: 12px;
+      text-align: center;
+      color: var(--text-secondary);
+    }
+
+    /* Footer Styles */
+    footer {
+      text-align: center;
+      padding: var(--spacing-md) 0;
+      color: var(--text-secondary);
+      font-size: 12px;
+      margin-top: auto;
+    }
+
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Loading Animation */
+    @keyframes pulse {
+      0% { opacity: 0.6; }
+      50% { opacity: 1; }
+      100% { opacity: 0.6; }
+    }
+
+    .loading {
+      animation: pulse 1.5s infinite ease-in-out;
+    }
+
+    /* Responsive Styles */
+    @media (max-width: 768px) {
+      .video-container {
+        width: 100%;
+      }
+
+      .sidebar-container {
+        bottom: 0;
+        top: auto;
+        width: 100%;
+        height: 60vh; /* Take up 60% of viewport height */
+        transform: translateY(100%);
+      }
+
+      .sidebar-container.open {
+        transform: translateY(0);
+      }
+
+      .sidebar {
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+      }
+
+      .sidebar-toggle {
+        left: 50%;
+        top: -40px;
+        transform: translateX(-50%);
+        width: 80px;
+        height: 40px;
+        border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      }
+      
+      .history-panel {
+        top: auto;
+        bottom: 0;
+        width: 100%;
+        height: 60vh;
+        transform: translateY(100%);
+      }
+      
+      .history-panel.open {
+        transform: translateY(0);
+      }
+      
+      .history-sidebar {
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+      }
+      
+      .history-toggle {
+        right: 50%;
+        top: -40px;
+        transform: translateX(50%);
+        width: 80px;
+        height: 40px;
+        border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      }
+
+      .header-icons {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="logo">
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" class="logo-icon">
+          <path d="M14 2C7.373 2 2 7.373 2 14C2 20.627 7.373 26 14 26C20.627 26 26 20.627 26 14C26 7.373 20.627 2 14 2Z" stroke="#1ABC9C" stroke-width="2"/>
+          <path d="M14 7V14L18 18" stroke="#1ABC9C" stroke-width="2" stroke-linecap="round"/>
+          <path d="M7 14H10M18 14H21" stroke="#1ABC9C" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        MotionSpeak
+      </div>
+      <div class="header-icons">
+        <button class="icon-btn disabled" title="Toggle Dark Mode (Disabled)">
+          <i class="fas fa-moon"></i>
+        </button>
+        <button class="icon-btn" title="Desktop View">
+          <i class="fas fa-desktop"></i>
+        </button>
+        <button class="icon-btn" title="Mobile View">
+          <i class="fas fa-mobile-alt"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <div class="video-section">
+        <div class="video-container">
+          <div class="video-placeholder" id="videoPlaceholder">
+            <div class="placeholder-content">
+              <i class="fas fa-video placeholder-icon"></i>
+              <p>Camera feed will appear here</p>
+            </div>
+          </div>
+          
+          <!-- Legend Box -->
+          <div class="legend-box" id="legendBox">
+            <div class="legend-item">
+              <div class="legend-label">Model:</div>
+              <div class="legend-value">HandNet-v2</div>
+              <div class="info-icon">
+                <i class="fas fa-info-circle"></i>
+                <div class="tooltip">The AI model used for hand gesture recognition</div>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-label">Latency:</div>
+              <div class="legend-value">27 ms</div>
+              <div class="info-icon">
+                <i class="fas fa-info-circle"></i>
+                <div class="tooltip">Time taken to process each frame</div>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-label">FPS:</div>
+              <div class="legend-value">30</div>
+              <div class="info-icon">
+                <i class="fas fa-info-circle"></i>
+                <div class="tooltip">Frames processed per second</div>
+              </div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-label">Resolution:</div>
+              <div class="legend-value">640×480</div>
+              <div class="info-icon">
+                <i class="fas fa-info-circle"></i>
+                <div class="tooltip">Video capture resolution in pixels</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="controls-container">
+          <button class="action-btn" id="startButton">Start Detection</button>
+          
+          <!-- Emoji Display -->
+          <div class="emoji-display" id="emojiDisplay">
+            <div class="emoji-placeholder">Gesture emoji</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Panel (left sidebar) -->
+  <div class="history-panel" id="historyPanel">
+    <button class="history-toggle" id="historyToggle">
+      <i class="fas fa-chevron-right" id="historyToggleIcon"></i>
+    </button>
+    <div class="history-sidebar">
+      <div class="history-header">
+        <div class="history-title">Gesture History</div>
+      </div>
+      <div class="history-content">
+        <ul class="history-list" id="historyList">
+          <li class="history-empty">No gestures detected yet.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar (positioned outside the container to be flush with the viewport) -->
+  <div class="sidebar-container" id="sidebarContainer">
+    <button class="sidebar-toggle" id="sidebarToggle">
+      <i class="fas fa-chevron-left" id="toggleIcon"></i>
+    </button>
+    <div class="sidebar">
+      <div class="sidebar-content" id="sidebar-content">
+        <div class="sidebar-header">Supported Gestures</div>
+        <div class="gesture-grid">
+          <div class="gesture-item" data-gesture="Open Hand">
+            <div class="gesture-icon"><i class="fas fa-hand-paper"></i></div>
+            <div class="gesture-label">Open Hand</div>
+          </div>
+          <div class="gesture-item" data-gesture="Closed Fist">
+            <div class="gesture-icon"><i class="fas fa-hand-rock"></i></div>
+            <div class="gesture-label">Closed Fist</div>
+          </div>
+          <div class="gesture-item" data-gesture="Thumb Up">
+            <div class="gesture-icon"><i class="fas fa-thumbs-up"></i></div>
+            <div class="gesture-label">Thumb Up</div>
+          </div>
+          <div class="gesture-item" data-gesture="Thumb Down">
+            <div class="gesture-icon"><i class="fas fa-thumbs-down"></i></div>
+            <div class="gesture-label">Thumb Down</div>
+          </div>
+          <div class="gesture-item" data-gesture="Peace Sign">
+            <div class="gesture-icon"><i class="fas fa-hand-peace"></i></div>
+            <div class="gesture-label">Peace Sign</div>
+          </div>
+          <div class="gesture-item" data-gesture="Pointing">
+            <div class="gesture-icon"><i class="fas fa-hand-point-up"></i></div>
+            <div class="gesture-label">Pointing</div>
+          </div>
+          <div class="gesture-item" data-gesture="Spock">
+            <div class="gesture-icon"><i class="fas fa-hand-spock"></i></div>
+            <div class="gesture-label">Spock</div>
+          </div>
+          <div class="gesture-item" data-gesture="Stop Sign">
+            <div class="gesture-icon"><i class="fas fa-ban"></i></div>
+            <div class="gesture-label">Stop Sign</div>
+          </div>
+          <div class="gesture-item" data-gesture="Swiping Up">
+            <div class="gesture-icon"><i class="fas fa-arrow-up"></i></div>
+            <div class="gesture-label">Swiping Up</div>
+          </div>
+          <div class="gesture-item" data-gesture="Swiping Down">
+            <div class="gesture-icon"><i class="fas fa-arrow-down"></i></div>
+            <div class="gesture-label">Swiping Down</div>
+          </div>
+          <div class="gesture-item" data-gesture="Swiping Left">
+            <div class="gesture-icon"><i class="fas fa-arrow-left"></i></div>
+            <div class="gesture-label">Swiping Left</div>
+          </div>
+          <div class="gesture-item" data-gesture="Swiping Right">
+            <div class="gesture-icon"><i class="fas fa-arrow-right"></i></div>
+            <div class="gesture-label">Swiping Right</div>
+          </div>
+          <div class="gesture-item" data-gesture="Shaking Hand">
+            <div class="gesture-icon"><i class="fas fa-arrows-up-down"></i></div>
+            <div class="gesture-label">Shaking Hand</div>
+          </div>
+          <div class="gesture-item" data-gesture="Hand Clockwise">
+            <div class="gesture-icon"><i class="fas fa-rotate-right"></i></div>
+            <div class="gesture-label">Hand Clockwise</div>
+          </div>
+          <div class="gesture-item" data-gesture="Hand Counterclockwise">
+            <div class="gesture-icon"><i class="fas fa-rotate-left"></i></div>
+            <div class="gesture-label">Hand Counterclockwise</div>
+          </div>
+          <div class="gesture-item" data-gesture="Rolling Hand Forward">
+            <div class="gesture-icon"><i class="fas fa-caret-up"></i></div>
+            <div class="gesture-label">Rolling Hand Forward</div>
+          </div>
+          <div class="gesture-item" data-gesture="Rolling Hand Backward">
+            <div class="gesture-icon"><i class="fas fa-caret-down"></i></div>
+            <div class="gesture-label">Rolling Hand Backward</div>
+          </div>
+          <div class="gesture-item" data-gesture="No Gesture">
+            <div class="gesture-icon"><i class="fas fa-ellipsis-h"></i></div>
+            <div class="gesture-label">No Gesture</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    Developed by <a href="https://github.com/hcn1z1" target="_blank">HCN1z1</a>
+  </footer>
+
+  <script>
+    // DOM Elements
+    const startButton = document.getElementById('startButton');
+    const videoPlaceholder = document.getElementById('videoPlaceholder');
+    const legendBox = document.getElementById('legendBox');
+    const emojiDisplay = document.getElementById('emojiDisplay');
+    const sidebarContainer = document.getElementById('sidebarContainer');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const toggleIcon = document.getElementById('toggleIcon');
+    const historyPanel = document.getElementById('historyPanel');
+    const historyToggle = document.getElementById('historyToggle');
+    const historyToggleIcon = document.getElementById('historyToggleIcon');
+    const historyList = document.getElementById('historyList');
+    
+    // Gesture history array
+    let gestureHistory = [];
+    
+    // Gesture icon mapping (FontAwesome classes)
+    const gestureIcons = {
+      "Open Hand": "fa-hand-paper",
+      "Closed Fist": "fa-hand-rock",
+      "Thumb Up": "fa-thumbs-up",
+      "Thumb Down": "fa-thumbs-down",
+      "Peace Sign": "fa-hand-peace",
+      "Pointing": "fa-hand-point-up",
+      "Spock": "fa-hand-spock",
+      "Stop Sign": "fa-ban",
+      "Swiping Up": "fa-arrow-up",
+      "Swiping Down": "fa-arrow-down",
+      "Swiping Left": "fa-arrow-left",
+      "Swiping Right": "fa-arrow-right",
+      "Shaking Hand": "fa-arrows-up-down",
+      "Hand Clockwise": "fa-rotate-right",
+      "Hand Counterclockwise": "fa-rotate-left",
+      "Rolling Hand Forward": "fa-caret-up",
+      "Rolling Hand Backward": "fa-caret-down",
+      "No Gesture": "fa-ellipsis-h"
+    };
+
+    // Function to format the time nicely
+    function formatTime(date) {
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      const milliseconds = date.getMilliseconds().toString().padStart(3, '0');
+      return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+    }
+    
+    // Function to display a gesture in the emoji display
+    function displayGesture(gestureName) {
+      const iconClass = gestureIcons[gestureName];
+      if (iconClass) {
+        emojiDisplay.innerHTML = `
+          <div class="emoji-icon">
+            <i class="fas ${iconClass}"></i>
+          </div>
+          <div class="emoji-label">${gestureName}</div>
+        `;
+        emojiDisplay.classList.add('active');
+        
+        // Add to history if detection is active
+        if (videoPlaceholder.classList.contains('video-active')) {
+          addGestureToHistory(gestureName);
+        }
+      } else {
+        emojiDisplay.innerHTML = '<div class="emoji-placeholder">Gesture emoji</div>';
+        emojiDisplay.classList.remove('active');
+      }
+    }
+    
+    // Function to add a gesture to history
+    function addGestureToHistory(gestureName) {
+      const timestamp = new Date();
+      const historyItem = {
+        gesture: gestureName,
+        timestamp: timestamp,
+        icon: gestureIcons[gestureName] || 'fa-question'
+      };
+      
+      // Add to our history array
+      gestureHistory.unshift(historyItem);
+      
+      // Update the history list in the UI
+      updateHistoryList();
+    }
+    
+    // Function to update the history list in the UI
+    function updateHistoryList() {
+      if (gestureHistory.length === 0) {
+        historyList.innerHTML = '<li class="history-empty">No gestures detected yet.</li>';
+        return;
+      }
+      
+      historyList.innerHTML = '';
+      
+      gestureHistory.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'history-item';
+        if (index === 0) li.classList.add('highlight');
+        
+        li.innerHTML = `
+          <div class="history-icon">
+            <i class="fas ${item.icon}"></i>
+          </div>
+          <div class="history-info">
+            <div class="history-gesture">${item.gesture}</div>
+            <div class="history-time">${formatTime(item.timestamp)}</div>
+          </div>
+        `;
+        
+        historyList.appendChild(li);
+      });
+      
+      // Scroll to the top to show the latest entry
+      historyList.scrollTop = 0;
+    }
+    
+    // Check for mobile devices
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    // Start button click handler
+    startButton.addEventListener('click', function(e) {
+      // Ripple effect
+      const ripple = document.createElement('span');
+      ripple.classList.add('ripple');
+      
+      const rect = this.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      ripple.style.left = x + 'px';
+      ripple.style.top = y + 'px';
+      
+      this.appendChild(ripple);
+      
+      setTimeout(() => {
+        ripple.remove();
+      }, 600);
+      
+      // Toggle video active state
+      if (videoPlaceholder.classList.contains('video-active')) {
+        videoPlaceholder.classList.remove('video-active');
+        startButton.textContent = 'Start Detection';
+        legendBox.classList.remove('active');
+        
+        // Reset emoji display
+        emojiDisplay.innerHTML = '<div class="emoji-placeholder">Gesture emoji</div>';
+        emojiDisplay.classList.remove('active');
+        
+        // Clear the demo interval
+        if (window.demoInterval) {
+          clearInterval(window.demoInterval);
+        }
+      } else {
+        videoPlaceholder.classList.add('video-active');
+        startButton.textContent = 'Stop Detection';
+        // Show legend box with a slight delay
+        setTimeout(() => {
+          legendBox.classList.add('active');
+          
+          // For demo purposes, show a random gesture icon when detection starts
+          const gestures = Object.keys(gestureIcons);
+          const randomGesture = gestures[Math.floor(Math.random() * gestures.length)];
+          displayGesture(randomGesture);
+          
+          // Set up a demo interval to show different gestures (for demonstration only)
+          window.demoInterval = setInterval(() => {
+            const gestures = Object.keys(gestureIcons);
+            const randomGesture = gestures[Math.floor(Math.random() * gestures.length)];
+            displayGesture(randomGesture);
+          }, 3000);
+        }, 300);
+      }
+    });
+    
+    // Sidebar toggle handler
+    sidebarToggle.addEventListener('click', function() {
+      sidebarContainer.classList.toggle('open');
+      
+      if (sidebarContainer.classList.contains('open')) {
+        toggleIcon.classList.remove('fa-chevron-right');
+        toggleIcon.classList.add('fa-chevron-left');
+      } else {
+        toggleIcon.classList.remove('fa-chevron-left');
+        toggleIcon.classList.add('fa-chevron-right');
+      }
+    });
+    
+    // History panel toggle handler
+    historyToggle.addEventListener('click', function() {
+      historyPanel.classList.toggle('open');
+      
+      if (historyPanel.classList.contains('open')) {
+        historyToggleIcon.classList.remove('fa-chevron-right');
+        historyToggleIcon.classList.add('fa-chevron-left');
+      } else {
+        historyToggleIcon.classList.remove('fa-chevron-left');
+        historyToggleIcon.classList.add('fa-chevron-right');
+      }
+    });
+    
+    // Initialize UI based on screen size
+    window.addEventListener('DOMContentLoaded', () => {
+      if (isMobile) {
+        // Mobile layout
+        toggleIcon.classList.remove('fa-chevron-left');
+        toggleIcon.classList.add('fa-chevron-down');
+        historyToggleIcon.classList.remove('fa-chevron-left', 'fa-chevron-right');
+        historyToggleIcon.classList.add('fa-chevron-up');
+      } else {
+        // Desktop layout - sidebar visible by default
+        sidebarContainer.classList.add('open');
+        historyPanel.classList.add('open');
+      }
+      
+      // Initialize history list
+      updateHistoryList();
+    });
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      if (window.innerWidth <= 768) {
+        // Mobile layout
+        toggleIcon.classList.remove('fa-chevron-left', 'fa-chevron-right');
+        historyToggleIcon.classList.remove('fa-chevron-left', 'fa-chevron-right');
+        
+        if (sidebarContainer.classList.contains('open')) {
+          toggleIcon.classList.add('fa-chevron-down');
+        } else {
+          toggleIcon.classList.add('fa-chevron-up');
+        }
+        
+        if (historyPanel.classList.contains('open')) {
+          historyToggleIcon.classList.add('fa-chevron-down');
+        } else {
+          historyToggleIcon.classList.add('fa-chevron-up');
+        }
+      } else {
+        // Desktop layout
+        toggleIcon.classList.remove('fa-chevron-up', 'fa-chevron-down');
+        historyToggleIcon.classList.remove('fa-chevron-up', 'fa-chevron-down');
+        
+        if (sidebarContainer.classList.contains('open')) {
+          toggleIcon.classList.add('fa-chevron-left');
+        } else {
+          toggleIcon.classList.add('fa-chevron-right');
+        }
+        
+        if (historyPanel.classList.contains('open')) {
+          historyToggleIcon.classList.add('fa-chevron-left');
+        } else {
+          historyToggleIcon.classList.add('fa-chevron-right');
+        }
+      }
+    });
+
+    // Click on gesture items to preview them in the emoji display
+    document.querySelectorAll('.gesture-item').forEach(item => {
+      item.addEventListener('click', function() {
+        if (videoPlaceholder.classList.contains('video-active')) {
+          const gestureName = this.getAttribute('data-gesture');
+          displayGesture(gestureName);
+          
+          // Clear any existing demo interval
+          if (window.demoInterval) {
+            clearInterval(window.demoInterval);
+          }
+        }
+      });
+    });
+
+    // Support for dark/light mode
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
+    
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+      if (event.matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    });
+  </script>
+</body>
+</html>
