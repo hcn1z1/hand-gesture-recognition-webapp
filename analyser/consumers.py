@@ -131,7 +131,9 @@ class GestureConsumer(AsyncWebsocketConsumer):
             except Exception as e:
                 print(f"Error processing image: {e}")
                 await self.send(text_data=json.dumps({'error': f'Image processing failed: {str(e)}'}))
-
+        else:
+            print("Received non-image data, ignoring")
+            print(text_data)
     def process_keypoints(self, image):
         """Extract keypoints using MediaPipe."""
         image_np = np.array(image)
