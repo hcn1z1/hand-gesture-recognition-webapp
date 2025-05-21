@@ -176,8 +176,12 @@ function displayGesture(gestureData) {
 async function initializeVideoCapture() {
     try {
         // Request user permission to access the camera
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
         videoStream = await navigator.mediaDevices.getUserMedia({
             video: { 
+                deviceId: videoDevices.length > 0 ? videoDevices[0].deviceId : undefined,
+                facingMode: { ideal: 'user' }, // Use the front camera if available
                 width: { ideal: 640 },
                 height: { ideal: 480 },
                 frameRate: { ideal: 30 }
