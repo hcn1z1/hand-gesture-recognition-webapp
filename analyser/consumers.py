@@ -66,82 +66,75 @@ class GestureConsumer(AsyncWebsocketConsumer):
         super().__init__(*args, **kwargs)
         self.frame_queue = []
         self.last_frame_time = None
-        self.processing_task = None
+        self.processing_lock = asyncio.Lock()
         self.max_frames = FRAMES_PER_CLIP * 2  # 12 * 2 = 24 (frames + keypoints)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print(f"Loading model from {CHECKPOINT_PATH} on device {self.device}")
+        self.debug = False  
+        self.log(f"Loading model from {CHECKPOINT_PATH} on device {self.device}")
         start_time = time.time()
         self.model = torch.load(CHECKPOINT_PATH, map_location=self.device, weights_only=False)
         self.model.eval()
         load_time = time.time() - start_time
-        print(f"Model loaded in {load_time:.2f} seconds")
+        self.log(f"Model loaded in {load_time:.2f} seconds")
+
+    def log(self, message):
+        """Log message if debug is True."""
+        if self.debug:
+            print(message)
 
     async def connect(self):
         await self.accept()
-        print("WebSocket connected")
+        self.log("WebSocket connected")
         await self.send(text_data=json.dumps({'message': 'WebSocket connected', 'type': 'info'}))
 
     async def disconnect(self, close_code):
-        print(f"WebSocket disconnected with code: {close_code}. Cancelling processing task.")
-        if self.processing_task is not None:
-            self.processing_task.cancel()
+        self.log(f"WebSocket disconnected with code: {close_code}")
         self.frame_queue = []  # Clear queue on disconnect
         await self.send(text_data=json.dumps({'message': 'WebSocket disconnected', 'type': 'info'}))
 
     async def receive(self, text_data=None, bytes_data=None):
-        print(f"Received data - text_data: {text_data[:30] if text_data else None}, bytes_data: {bytes_data[:30] if bytes_data else None}")
+        self.log(f"Received data - text_data: {text_data[:30] if text_data else None}, bytes_data: {bytes_data[:30] if bytes_data else None}")
         if text_data:
-            try:
-                start_time = time.time()
-                # Decode base64 string from text_data
-                image_data = base64.b64decode(text_data)
-                image = Image.open(io.BytesIO(image_data)).convert('RGB')
-                decode_time = time.time() - start_time
-                print(f"Image decoded in {decode_time:.2f} seconds")
+            async with self.processing_lock:
+                try:
+                    start_time = time.time()
+                    # Decode base64 string from text_data
+                    image_data = base64.b64decode(text_data)
+                    image = Image.open(io.BytesIO(image_data)).convert('RGB')
+                    decode_time = time.time() - start_time
+                    self.log(f"Image decoded in {decode_time:.2f} seconds")
 
-                # Transform image
-                start_time = time.time()
-                image_tensor = transform(image).to(self.device)
-                transform_time = time.time() - start_time
-                print(f"Image transformed in {transform_time:.2f} seconds")
-                self.frame_queue.append(image_tensor)
+                    # Transform image
+                    start_time = time.time()
+                    image_tensor = transform(image).to(self.device)
+                    transform_time = time.time() - start_time
+                    self.log(f"Image transformed in {transform_time:.2f} seconds")
+                    self.frame_queue.append(image_tensor)
 
-                # Record time of last frame
-                self.last_frame_time = time.time()
+                    # Record time of last frame
+                    self.last_frame_time = time.time()
 
-                # Process keypoints asynchronously
-                start_time = time.time()
-                keypoints = await sync_to_async(self.process_keypoints)(image)
-                keypoint_time = time.time() - start_time
-                print(f"Keypoints extracted in {keypoint_time:.2f} seconds")
-                self.frame_queue.append(keypoints)
+                    # Process keypoints asynchronously
+                    start_time = time.time()
+                    keypoints = await sync_to_async(self.process_keypoints)(image)
+                    keypoint_time = time.time() - start_time
+                    self.log(f"Keypoints extracted in {keypoint_time:.2f} seconds")
+                    self.frame_queue.append(keypoints)
 
-                # Limit queue size to prevent backlog
-                if len(self.frame_queue) > self.max_frames * 2:  # e.g., 48 elements
-                    self.frame_queue = self.frame_queue[-self.max_frames:]  # Keep latest
-                    print("Queue trimmed to prevent backlog")
-
-                if len(self.frame_queue) >= self.max_frames:
-                    # Extract frames and keypoints
-                    clip_data = self.frame_queue[:self.max_frames]
-                    frames = clip_data[0::2]  # Image tensors (0, 2, 4, ...)
-                    keypoints_list = clip_data[1::2]  # Keypoints (1, 3, 5, ...)
-                    # Cancel any ongoing task
-                    if self.processing_task is not None and not self.processing_task.done():
-                        self.processing_task.cancel()
-                        try:
-                            await self.processing_task
-                        except asyncio.CancelledError:
-                            pass
-                    print("Starting clip processing task")
-                    self.processing_task = asyncio.create_task(self.process_clip(frames, keypoints_list))
-                    # Empty the queue entirely
-                    self.frame_queue = []
-            except Exception as e:
-                print(f"Error processing image: {e}")
-                await self.send(text_data=json.dumps({'type': 'info', 'error': f'Image processing failed: {str(e)}'}))
+                    if len(self.frame_queue) >= self.max_frames:
+                        # Extract frames and keypoints
+                        clip_data = self.frame_queue[:self.max_frames]
+                        frames = clip_data[0::2]  # Image tensors (0, 2, 4, ...)
+                        keypoints_list = clip_data[1::2]  # Keypoints (1, 3, 5, ...)
+                        self.log("Processing clip")
+                        await self.process_clip(frames, keypoints_list)
+                        # Empty the queue entirely
+                        self.frame_queue = []
+                except Exception as e:
+                    self.log(f"Error processing image: {e}")
+                    await self.send(text_data=json.dumps({'type': 'info', 'error': f'Image processing failed: {str(e)}'}))
         else:
-            print("No text_data received")
+            self.log("No text_data received")
 
     def process_keypoints(self, image):
         """Extract keypoints using MediaPipe."""
@@ -159,22 +152,20 @@ class GestureConsumer(AsyncWebsocketConsumer):
 
     async def process_clip(self, frames, keypoints_list):
         """Process a clip of frames and keypoints through the model."""
-        print("Processing clip")
         start_time = time.time()
-
         try:
             # Stack frames and keypoints
             clip = torch.stack(frames).unsqueeze(0)  # [1, T, C, H, W]
             clip = clip.permute(0, 2, 1, 3, 4)  # [1, C, T, H, W]
             joint_stream = torch.stack(keypoints_list).unsqueeze(0)  # [1, T, 48, 3]
-            print(f"Clip shape: {clip.shape}, Joint stream shape: {joint_stream.shape}")
+            self.log(f"Clip shape: {clip.shape}, Joint stream shape: {joint_stream.shape}")
 
             # Run inference directly
             with torch.no_grad():
                 inference_start = time.time()
                 outputs = self.model(clip, joint_stream)
                 inference_time = time.time() - inference_start
-                print(f"Inference completed in {inference_time:.2f} seconds")
+                self.log(f"Inference completed in {inference_time:.2f} seconds")
 
             # Handle model output (tensor or dictionary)
             if isinstance(outputs, dict):
@@ -186,11 +177,10 @@ class GestureConsumer(AsyncWebsocketConsumer):
             pred_class = probs.argmax().item()
             pred_label = ACTIONS[pred_class]
             confidence = probs[pred_class].item()
-            print(f"Prediction: {pred_label} with confidence {confidence:.2f}")
+            self.log(f"Prediction: {pred_label} with confidence {confidence:.2f}")
 
             # Debug info
             debug_info = {}
-            self.frame_queue = []  # Clear the queue after processing
             if isinstance(outputs, dict):
                 for key, output in outputs.items():
                     if torch.isnan(output).any() or torch.isinf(output).any():
@@ -202,7 +192,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
 
             # Calculate latency
             latency = time.time() - self.last_frame_time
-            print(f"Total clip processing latency: {latency:.2f} seconds")
+            self.log(f"Total clip processing latency: {latency:.2f} seconds")
 
             # Send result
             result = {
@@ -213,9 +203,6 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 'debug_info': debug_info
             }
             await self.send(text_data=json.dumps(result))
-        except asyncio.CancelledError:
-            print("Clip processing task was cancelled")
-            raise
         except Exception as e:
-            print(f"Inference failed: {e}")
+            self.log(f"Inference failed: {e}")
             await self.send(text_data=json.dumps({'type': 'info', 'error': f'Inference failed: {str(e)}'}))
