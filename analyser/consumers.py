@@ -69,9 +69,11 @@ class GestureConsumer(AsyncWebsocketConsumer):
         super().__init__(*args, **kwargs)
         self.frame_queue = []
         self.last_frame_time = None
+        self.processing_task = None  # Initialize processing_task
+        self.max_frames = FRAMES_PER_CLIP * 2  # Define max_frames (e.g., 24)
         # Load model (do this once per consumer instance)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = torch.load(CHECKPOINT_PATH, map_location= self.device , weights_only= False)
+        self.model = torch.load(CHECKPOINT_PATH, map_location=self.device, weights_only=False)
         self.model.eval()
 
     async def connect(self):
@@ -80,14 +82,18 @@ class GestureConsumer(AsyncWebsocketConsumer):
 
     async def disconnect(self, close_code):
         print(f"WebSocket disconnected with code: {close_code}")
+        # Cancel any ongoing processing task
+        if self.processing_task is not None:
+            self.processing_task.cancel()
         await self.send(text_data=json.dumps({'message': 'WebSocket disconnected'}))
-        pose.close()
-        hands.close()
+        # Note: pose and hands are global, so closing them here may not be necessary
+        # pose.close()
+        # hands.close()
 
     async def receive(self, text_data=None, bytes_data=None):
         if bytes_data:
-            # Decode base64 image
             try:
+                # Decode base64 image
                 image_data = base64.b64decode(bytes_data)
                 image = Image.open(io.BytesIO(image_data)).convert('RGB')
             except Exception as e:
@@ -106,8 +112,19 @@ class GestureConsumer(AsyncWebsocketConsumer):
             self.frame_queue.append(keypoints)
 
             # Check if we have enough frames
-            if len(self.frame_queue) >= FRAMES_PER_CLIP * 2:  # Frames + keypoints
-                await self.process_clip()
+            if len(self.frame_queue) >= self.max_frames:
+                # Cancel any ongoing processing task
+                if self.processing_task is not None and not self.processing_task.done():
+                    self.processing_task.cancel()
+                    try:
+                        await self.processing_task  # Wait for cancellation
+                    except asyncio.CancelledError:
+                        pass
+
+                # Start new processing task
+                self.processing_task = asyncio.create_task(self.process_clip())
+                # Reset queue for new frames
+                self.frame_queue = []
 
     def process_keypoints(self, image):
         """Extract keypoints using MediaPipe."""
@@ -130,7 +147,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
         # Extract frames and keypoints
         frames = self.frame_queue[:FRAMES_PER_CLIP]
         keypoints = self.frame_queue[FRAMES_PER_CLIP:FRAMES_PER_CLIP * 2]
-        self.frame_queue = self.frame_queue[FRAMES_PER_CLIP * 2:]  # Clear processed frames
+        # Note: Queue is cleared in receive after task creation
 
         # Prepare clip
         clip = torch.stack(frames).unsqueeze(0)  # [1, T, C, H, W]
@@ -149,7 +166,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
             pred_label = ACTIONS[pred_class]
             confidence = probs[pred_class].item()
 
-            # Check for NaN/Inf in outputs
+            # Debug info
             debug_info = {}
             for key, output in outputs.items():
                 if torch.isnan(output).any() or torch.isinf(output).any():
@@ -171,89 +188,3 @@ class GestureConsumer(AsyncWebsocketConsumer):
 
         except Exception as e:
             await self.send(text_data=json.dumps({'error': f'Inference failed: {str(e)}'}))
-    async def connect(self):
-        await self.accept()
-        await self.send(text_data=json.dumps({"message": "Connected to ImageProcessorConsumer"}))
-
-    async def disconnect(self, close_code):
-        # Cancel any ongoing processing task on disconnect
-        if self.processing_task:
-            self.processing_task.cancel()
-
-    async def receive(self, text_data):
-        try:
-            # Parse incoming JSON data
-            data = json.loads(text_data)
-            image_data = data.get("image")  # Base64-encoded image string
-            second_input = data.get("second_input")  # Expected to be None
-
-            if not image_data or second_input is not None:
-                await self.send(text_data=json.dumps({
-                    "error": "Invalid input: 'image' required and 'second_input' must be null"
-                }))
-                return
-
-            # Decode base64 image
-            image_bytes = base64.b64decode(image_data)
-            image = Image.open(BytesIO(image_bytes)).convert('RGB')
-
-            # Preprocess image without torchvision
-            # Resize to 224x224 using Pillow
-            image = image.resize((224, 224), Image.Resampling.LANCZOS)
-
-            # Convert to tensor
-            image_array = np.array(image, dtype=np.float32) / 255.0  # Scale to [0, 1]
-            image_array = image_array.transpose(2, 0, 1)  # Convert to CHW format
-            image_tensor = torch.from_numpy(image_array)
-
-            # Normalize with ImageNet mean and std
-            mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
-            std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
-            image_tensor = (image_tensor - mean) / std
-
-            # Add image to queue
-            self.frame_queue.append(image_tensor)
-
-            # Check if we have 17 frames
-            if len(self.frame_queue) == self.max_frames:
-                # Cancel any ongoing processing task
-                if self.processing_task and not self.processing_task.done():
-                    self.processing_task.cancel()
-                    try:
-                        await self.processing_task  # Wait for cancellation
-                    except asyncio.CancelledError:
-                        pass
-
-                # Start new processing task
-                self.processing_task = asyncio.create_task(self.process_frames())
-                # Reset queue for new frames
-                self.frame_queue = []
-
-        except Exception as e:
-            await self.send(text_data=json.dumps({"error": str(e)}))
-
-    async def process_frames(self):
-        try:
-            if self.model is None:
-                await self.send(text_data=json.dumps({"error": "Model not loaded"}))
-                return
-
-            # Stack frames into a batch tensor [17, 3, 224, 224]
-            batch_tensor = torch.stack(self.frame_queue)
-
-            # Process batch with model
-            with torch.no_grad():
-                output = self.model(batch_tensor)  # Run inference
-                # Example: For classification, get predicted classes
-                _, predicted = torch.max(output, 1)
-                result = predicted.tolist()  # Convert to list for JSON
-
-            # Send result back to client
-            await self.send(text_data=json.dumps({"result": result}))
-
-        except asyncio.CancelledError:
-            # Handle task cancellation gracefully
-            await self.send(text_data=json.dumps({"message": "Processing cancelled due to new frames"}))
-            raise
-        except Exception as e:
-            await self.send(text_data=json.dumps({"error": f"Processing error: {str(e)}"}))
