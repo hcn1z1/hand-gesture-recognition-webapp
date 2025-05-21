@@ -333,7 +333,7 @@ function handleSocketMessage(event) {
         
         // Parse the JSON message
         const data = JSON.parse(event.data);
-        
+        console.log('Received message from server:', data);
         // Check if the data contains prediction information directly
         if (data.prediction !== undefined) {
             // This is the new format with prediction, confidence, latency, and debug_info
