@@ -7,3 +7,7 @@ pytorch
 mediapipe
 numpy
 opencv-python
+wsproto
+websockets
+whitenoise
+uvicorn

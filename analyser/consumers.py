@@ -72,13 +72,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
         self.last_frame_time = None
         # Load model (do this once per consumer instance)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = C3DImproved(
-            checkpoint_path=CHECKPOINT_PATH,
-            num_classes=NUM_CLASSES,
-            joint_dim=JOINT_DIM,
-            num_joints=NUM_JOINTS,
-            coords=COORDS
-        ).to(self.device)
+        self.model = torch.load(CHECKPOINT_PATH, map_location= self.device , weights_only= False)
         self.model.eval()
 
     async def connect(self):
