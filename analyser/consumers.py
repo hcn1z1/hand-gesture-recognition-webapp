@@ -91,12 +91,14 @@ class GestureConsumer(AsyncWebsocketConsumer):
         # hands.close()
 
     async def receive(self, text_data=None, bytes_data=None):
+        print("Received data")
         if bytes_data:
             try:
                 # Decode base64 image
                 image_data = base64.b64decode(bytes_data)
                 image = Image.open(io.BytesIO(image_data)).convert('RGB')
             except Exception as e:
+                print(f"Error decoding image: {e}")
                 await self.send(text_data=json.dumps({'error': f'Image decoding failed: {str(e)}'}))
                 return
 
