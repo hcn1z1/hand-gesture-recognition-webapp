@@ -88,7 +88,6 @@ class GestureConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({'message': 'WebSocket disconnected'}))
 
     async def receive(self, text_data=None, bytes_data=None):
-        print(f"Received data - text_data: {text_data[:30] if text_data else None}, bytes_data: {bytes_data[:30] if bytes_data else None}")
         if text_data:
             try:
                 start_time = time.time()
