@@ -10,11 +10,12 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 import mediapipe as mp
 from torchvision import transforms
+import concurrent.futures
 
 # Initialize MediaPipe
 mp_pose = mp.solutions.pose
 mp_hands = mp.solutions.hands
-pose = mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.5)
+pose = mp_pose.Pose(static_image_mode=False, min_detection_confidence=0.5, model_complexity=0)
 hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
 
 # Model parameters
@@ -22,7 +23,7 @@ NUM_CLASSES = 18
 JOINT_DIM = 144
 NUM_JOINTS = 48
 COORDS = 3
-FRAMES_PER_CLIP = 17  # Align with main.py
+FRAMES_PER_CLIP = 12  # Reduced for faster processing
 CHECKPOINT_PATH = 'models/best_model.pth'
 
 # Transform for images (match JesterSequenceDataset)
@@ -67,7 +68,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
         self.frame_queue = []
         self.last_frame_time = None
         self.processing_task = None
-        self.max_frames = FRAMES_PER_CLIP * 2  # 17 * 2 = 34 (frames + keypoints)
+        self.max_frames = FRAMES_PER_CLIP * 2  # 12 * 2 = 24 (frames + keypoints)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Loading model from {CHECKPOINT_PATH} on device {self.device}")
         start_time = time.time()
@@ -75,17 +76,20 @@ class GestureConsumer(AsyncWebsocketConsumer):
         self.model.eval()
         load_time = time.time() - start_time
         print(f"Model loaded in {load_time:.2f} seconds")
+        self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=1)
 
     async def connect(self):
         await self.accept()
         print("WebSocket connected")
-        await self.send(text_data=json.dumps({'message': 'WebSocket connected'}))
+        await self.send(text_data=json.dumps({'message': 'WebSocket connected', 'type': 'info'}))
 
     async def disconnect(self, close_code):
-        print(f"WebSocket disconnected with code: {close_code}")
+        print(f"WebSocket disconnected with code: {close_code}. Cancelling processing task.")
         if self.processing_task is not None:
             self.processing_task.cancel()
-        await self.send(text_data=json.dumps({'message': 'WebSocket disconnected'}))
+        self.frame_queue = []  # Clear queue on disconnect
+        self.executor.shutdown(wait=False)  # Shutdown executor
+        await self.send(text_data=json.dumps({'message': 'WebSocket disconnected', 'type': 'info'}))
 
     async def receive(self, text_data=None, bytes_data=None):
         print(f"Received data - text_data: {text_data[:30] if text_data else None}, bytes_data: {bytes_data[:30] if bytes_data else None}")
@@ -115,6 +119,11 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 print(f"Keypoints extracted in {keypoint_time:.2f} seconds")
                 self.frame_queue.append(keypoints)
 
+                # Limit queue size to prevent backlog
+                if len(self.frame_queue) > self.max_frames * 2:  # e.g., 48 elements
+                    self.frame_queue = self.frame_queue[-self.max_frames:]  # Keep latest
+                    print("Queue trimmed to prevent backlog")
+
                 if len(self.frame_queue) >= self.max_frames:
                     # Extract frames and keypoints
                     clip_data = self.frame_queue[:self.max_frames]
@@ -133,7 +142,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
                     self.frame_queue = []
             except Exception as e:
                 print(f"Error processing image: {e}")
-                await self.send(text_data=json.dumps({'error': f'Image processing failed: {str(e)}'}))
+                await self.send(text_data=json.dumps({'type': 'info', 'error': f'Image processing failed: {str(e)}'}))
         else:
             print("No text_data received")
 
@@ -163,16 +172,17 @@ class GestureConsumer(AsyncWebsocketConsumer):
             joint_stream = torch.stack(keypoints_list).unsqueeze(0)  # [1, T, 48, 3]
             print(f"Clip shape: {clip.shape}, Joint stream shape: {joint_stream.shape}")
 
-            # Run inference
+            # Run inference in a separate process
+            loop = asyncio.get_event_loop()
             with torch.no_grad():
                 inference_start = time.time()
-                outputs = self.model(clip, joint_stream)
+                outputs = await loop.run_in_executor(self.executor, lambda: self.model(clip, joint_stream))
                 inference_time = time.time() - inference_start
                 print(f"Inference completed in {inference_time:.2f} seconds")
 
-            # Handle model output (tensor, not dictionary)
+            # Handle model output (tensor or dictionary)
             if isinstance(outputs, dict):
-                final_output = outputs['final_output']  # For compatibility with dict output
+                final_output = outputs['final_output']  # For compatibility
             else:
                 final_output = outputs  # Direct tensor output [1, 18]
 
@@ -197,7 +207,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
             latency = time.time() - self.last_frame_time
             print(f"Total clip processing latency: {latency:.2f} seconds")
 
-            # Send result with 'type': 'info'
+            # Send result
             result = {
                 'type': 'info',
                 'prediction': pred_label,
@@ -206,6 +216,9 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 'debug_info': debug_info
             }
             await self.send(text_data=json.dumps(result))
+        except asyncio.CancelledError:
+            print("Clip processing task was cancelled")
+            raise
         except Exception as e:
             print(f"Inference failed: {e}")
-            await self.send(text_data=json.dumps({'error': f'Inference failed: {str(e)}'}))
+            await self.send(text_data=json.dumps({'type': 'info', 'error': f'Inference failed: {str(e)}'}))
