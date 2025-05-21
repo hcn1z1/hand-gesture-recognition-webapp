@@ -36,9 +36,15 @@ transform = transforms.Compose([
 ])
 
 # Actions list (replace with your actual actions)
-ACTIONS = ['wave', 'clap', 'point', 'swipe_left', 'swipe_right', 'swipe_up', 'swipe_down', 
-           'circle', 'cross', 'thumbs_up', 'thumbs_down', 'stop', 'ok', 'call', 'peace', 
-           'fist', 'open_hand', 'snap']
+ACTIONS = [
+    "Doing other things", "No gesture", "Rolling Hand Backward", "Rolling Hand Forward",
+    "Shaking Hand", "Sliding Two Fingers Down", "Sliding Two Fingers Left",
+    "Sliding Two Fingers Right", "Sliding Two Fingers Up", "Stop Sign",
+    "Swiping Down", "Swiping Left", "Swiping Right", "Swiping Up",
+    "Thumb Down", "Thumb Up", "Turning Hand Clockwise", "Turning Hand Counterclockwise"
+]
+label2id = {action: idx for idx, action in enumerate(ACTIONS)}
+
 
 def extract_keypoints(pose_landmarks, left_hand_landmarks, right_hand_landmarks):
     """Extract keypoints from pose and hand landmarks."""
