@@ -22,7 +22,7 @@ NUM_CLASSES = 18
 JOINT_DIM = 144
 NUM_JOINTS = 48
 COORDS = 3
-FRAMES_PER_CLIP = 12
+FRAMES_PER_CLIP = 17  # Align with main.py
 CHECKPOINT_PATH = 'models/best_model.pth'
 
 # Transform for images (match JesterSequenceDataset)
@@ -67,7 +67,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
         self.frame_queue = []
         self.last_frame_time = None
         self.processing_task = None
-        self.max_frames = FRAMES_PER_CLIP * 2
+        self.max_frames = FRAMES_PER_CLIP * 2  # 17 * 2 = 34 (frames + keypoints)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print(f"Loading model from {CHECKPOINT_PATH} on device {self.device}")
         start_time = time.time()
@@ -161,6 +161,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
             clip = torch.stack(frames).unsqueeze(0)  # [1, T, C, H, W]
             clip = clip.permute(0, 2, 1, 3, 4)  # [1, C, T, H, W]
             joint_stream = torch.stack(keypoints_list).unsqueeze(0)  # [1, T, 48, 3]
+            print(f"Clip shape: {clip.shape}, Joint stream shape: {joint_stream.shape}")
 
             # Run inference
             with torch.no_grad():
@@ -169,8 +170,12 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 inference_time = time.time() - inference_start
                 print(f"Inference completed in {inference_time:.2f} seconds")
 
-            # Extract final prediction
-            final_output = outputs['final_output']  # [1, 18]
+            # Handle model output (tensor, not dictionary)
+            if isinstance(outputs, dict):
+                final_output = outputs['final_output']  # For compatibility with dict output
+            else:
+                final_output = outputs  # Direct tensor output [1, 18]
+
             probs = torch.softmax(final_output, dim=1).squeeze(0).cpu().numpy()
             pred_class = probs.argmax().item()
             pred_label = ACTIONS[pred_class]
@@ -179,11 +184,14 @@ class GestureConsumer(AsyncWebsocketConsumer):
 
             # Debug info
             debug_info = {}
-            for key, output in outputs.items():
-                if torch.isnan(output).any() or torch.isinf(output).any():
-                    debug_info[key] = "NaN or Inf detected"
-                else:
-                    debug_info[key] = str(output.shape)
+            if isinstance(outputs, dict):
+                for key, output in outputs.items():
+                    if torch.isnan(output).any() or torch.isinf(output).any():
+                        debug_info[key] = "NaN or Inf detected"
+                    else:
+                        debug_info[key] = str(output.shape)
+            else:
+                debug_info['output'] = str(outputs.shape) if not (torch.isnan(outputs).any() or torch.isinf(outputs).any()) else "NaN or Inf detected"
 
             # Calculate latency
             latency = time.time() - self.last_frame_time
