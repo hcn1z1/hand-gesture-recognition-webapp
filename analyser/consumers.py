@@ -70,7 +70,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
         self.processing_lock = asyncio.Lock()
         self.max_frames = FRAMES_PER_CLIP * 2  # 12 * 2 = 24 (frames + keypoints)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.debug = False  
+        self.debug = True  
         self.log(f"Loading model from {CHECKPOINT_PATH} on device {self.device}")
         start_time = time.time()
         self.model = torch.load(CHECKPOINT_PATH, map_location=self.device, weights_only=False)
@@ -97,6 +97,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
         self.log(f"Received data - text_data: {text_data[:30] if text_data else None}, bytes_data: {bytes_data[:30] if bytes_data else None}")
         if text_data:
             if not self.capture:
+                self.log("Capture is paused, ignoring incoming data")
                 return
             try:
                 start_time = time.time()
@@ -130,7 +131,6 @@ class GestureConsumer(AsyncWebsocketConsumer):
                     keypoints_list = clip_data[1::2]  # Keypoints (1, 3, 5, ...)
                     self.log("Processing clip")
                     self.capture = False  # Prevent further processing until done
-                    print("Capture disabled", len(self.frame_queue))
                     await self.process_clip(frames, keypoints_list)
                     # Empty the queue entirely
                     self.frame_queue = []
@@ -208,7 +208,6 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 'debug_info': debug_info
             }
             self.capture = True  # Allow further processing
-            print("Capture enabled", len(self.frame_queue))
             await self.send(text_data=json.dumps(result))
         except Exception as e:
             self.log(f"Inference failed: {e}")
