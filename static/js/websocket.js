@@ -176,8 +176,14 @@ function displayGesture(gestureData) {
 async function initializeVideoCapture() {
     try {
         // Request user permission to access the camera
+        let videoDevices = [];
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        for (const device of devices) {
+            if (device.kind === 'videoinput') {
+                console.log('Camera found:', device.kind);
+                videoDevices.push(device);
+            }
+        }
         videoStream = await navigator.mediaDevices.getUserMedia({
             video: { 
                 deviceId: videoDevices.length > 0 ? videoDevices[0].deviceId : undefined,
