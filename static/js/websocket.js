@@ -3,25 +3,26 @@
  */
 
 const gestureIcons = {
-      "Open Hand": "fa-hand-paper",
-      "Closed Fist": "fa-hand-rock",
-      "Thumb Up": "fa-thumbs-up",
-      "Thumb Down": "fa-thumbs-down",
-      "Peace Sign": "fa-hand-peace",
-      "Pointing": "fa-hand-point-up",
-      "Spock": "fa-hand-spock",
-      "Stop Sign": "fa-ban",
-      "Swiping Up": "fa-arrow-up",
-      "Swiping Down": "fa-arrow-down",
-      "Swiping Left": "fa-arrow-left",
-      "Swiping Right": "fa-arrow-right",
-      "Shaking Hand": "fa-arrows-up-down",
-      "Hand Clockwise": "fa-rotate-right",
-      "Hand Counterclockwise": "fa-rotate-left",
-      "Rolling Hand Forward": "fa-caret-up",
-      "Rolling Hand Backward": "fa-caret-down",
-      "No Gesture": "fa-ellipsis-h"
+    "Doing other things": "fa-ellipsis-h", // Placeholder
+    "No gesture": "fa-ellipsis-h",
+    "Rolling Hand Backward": "fa-caret-down",
+    "Rolling Hand Forward": "fa-caret-up",
+    "Shaking Hand": "fa-arrows-up-down",
+    "Sliding Two Fingers Down": "fa-arrow-down", // Closest icon
+    "Sliding Two Fingers Left": "fa-arrow-left", // Closest icon
+    "Sliding Two Fingers Right": "fa-arrow-right", // Closest icon
+    "Sliding Two Fingers Up": "fa-arrow-up", // Closest icon
+    "Stop Sign": "fa-ban",
+    "Swiping Down": "fa-arrow-down",
+    "Swiping Left": "fa-arrow-left",
+    "Swiping Right": "fa-arrow-right",
+    "Swiping Up": "fa-arrow-up",
+    "Thumb Down": "fa-thumbs-down",
+    "Thumb Up": "fa-thumbs-up",
+    "Turning Hand Clockwise": "fa-rotate-right",
+    "Turning Hand Counterclockwise": "fa-rotate-left"
 };
+
 
 function startCapturingFrames() {
   if (isCapturing) return;
@@ -199,6 +200,20 @@ function displayGesture(gestureData) {
     }
 }
 
+ function addGestureToHistory(gestureName) {
+      const timestamp = new Date();
+      const historyItem = {
+        gesture: gestureName,
+        timestamp: timestamp,
+        icon: gestureIcons[gestureName] || 'fa-question'
+      };
+      
+      // Add to our history array
+      gestureHistory.unshift(historyItem);
+      
+      // Update the history list in the UI
+      updateHistoryList();
+    }
 /**
  * Initialize video capture from webcam
  */
