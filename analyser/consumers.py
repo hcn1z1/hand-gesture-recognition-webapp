@@ -130,7 +130,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
                     keypoints_list = clip_data[1::2]  # Keypoints (1, 3, 5, ...)
                     self.log("Processing clip")
                     self.capture = False  # Prevent further processing until done
-                    print("Capture disabled")
+                    print("Capture disabled", len(self.frame_queue))
                     await self.process_clip(frames, keypoints_list)
                     # Empty the queue entirely
                     self.frame_queue = []
@@ -207,7 +207,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 'debug_info': debug_info
             }
             self.capture = True  # Allow further processing
-            print("Capture enabled")
+            print("Capture enabled", len(self.frame_queue))
             await self.send(text_data=json.dumps(result))
         except Exception as e:
             self.log(f"Inference failed: {e}")
