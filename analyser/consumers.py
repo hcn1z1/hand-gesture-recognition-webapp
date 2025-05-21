@@ -11,7 +11,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from asgiref.sync import sync_to_async
 import mediapipe as mp
-from .model import C3DImprovedPreview  # Import your C3DImprovedPreview model
+from .model import C3DImproved # Import your C3DImprovedPreview model
 from torchvision import transforms
 
 # Initialize MediaPipe
@@ -26,7 +26,7 @@ JOINT_DIM = 144
 NUM_JOINTS = 48
 COORDS = 3
 FRAMES_PER_CLIP = 12
-CHECKPOINT_PATH = 'checkpoints/best_model.pth'
+CHECKPOINT_PATH = 'models/best_model.pth'
 
 # Transform for images (match JesterSequenceDataset)
 transform = transforms.Compose([
@@ -72,7 +72,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
         self.last_frame_time = None
         # Load model (do this once per consumer instance)
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = C3DImprovedPreview(
+        self.model = C3DImproved(
             checkpoint_path=CHECKPOINT_PATH,
             num_classes=NUM_CLASSES,
             joint_dim=JOINT_DIM,
