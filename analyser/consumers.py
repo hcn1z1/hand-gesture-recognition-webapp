@@ -7,11 +7,9 @@ from PIL import Image
 import io
 import asyncio
 from channels.generic.websocket import AsyncWebsocketConsumer
-from django.conf import settings
 from asgiref.sync import sync_to_async
 import mediapipe as mp
 from torchvision import transforms
-import logging
 
 # Initialize MediaPipe
 mp_pose = mp.solutions.pose
@@ -44,10 +42,6 @@ ACTIONS = [
 ]
 label2id = {action: idx for idx, action in enumerate(ACTIONS)}
 
-# Set up logging
-logger = logging.getLogger('GestureConsumer')
-logger.setLevel(logging.INFO)
-
 def extract_keypoints(pose_landmarks, left_hand_landmarks, right_hand_landmarks):
     """Extract keypoints from pose and hand landmarks."""
     keypoints = []
@@ -75,39 +69,39 @@ class GestureConsumer(AsyncWebsocketConsumer):
         self.processing_task = None
         self.max_frames = FRAMES_PER_CLIP * 2
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        logger.info(f"Loading model from {CHECKPOINT_PATH} on device {self.device}")
+        print(f"Loading model from {CHECKPOINT_PATH} on device {self.device}")
         start_time = time.time()
         self.model = torch.load(CHECKPOINT_PATH, map_location=self.device, weights_only=False)
         self.model.eval()
         load_time = time.time() - start_time
-        logger.info(f"Model loaded in {load_time:.2f} seconds")
+        print(f"Model loaded in {load_time:.2f} seconds")
 
     async def connect(self):
         await self.accept()
-        logger.info("WebSocket connected")
+        print("WebSocket connected")
         await self.send(text_data=json.dumps({'message': 'WebSocket connected'}))
 
     async def disconnect(self, close_code):
-        logger.info(f"WebSocket disconnected with code: {close_code}")
+        print(f"WebSocket disconnected with code: {close_code}")
         if self.processing_task is not None:
             self.processing_task.cancel()
         await self.send(text_data=json.dumps({'message': 'WebSocket disconnected'}))
 
     async def receive(self, text_data=None, bytes_data=None):
-        logger.info("Received data")
+        print("Received data")
         if bytes_data:
             try:
                 start_time = time.time()
                 image_data = base64.b64decode(bytes_data)
                 image = Image.open(io.BytesIO(image_data)).convert('RGB')
                 decode_time = time.time() - start_time
-                logger.info(f"Image decoded in {decode_time:.2f} seconds")
+                print(f"Image decoded in {decode_time:.2f} seconds")
 
                 # Transform image
                 start_time = time.time()
                 image_tensor = transform(image).to(self.device)
                 transform_time = time.time() - start_time
-                logger.info(f"Image transformed in {transform_time:.2f} seconds")
+                print(f"Image transformed in {transform_time:.2f} seconds")
                 self.frame_queue.append(image_tensor)
 
                 # Record time of last frame
@@ -117,7 +111,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 start_time = time.time()
                 keypoints = await sync_to_async(self.process_keypoints)(image)
                 keypoint_time = time.time() - start_time
-                logger.info(f"Keypoints extracted in {keypoint_time:.2f} seconds")
+                print(f"Keypoints extracted in {keypoint_time:.2f} seconds")
                 self.frame_queue.append(keypoints)
 
                 if len(self.frame_queue) >= self.max_frames:
@@ -127,10 +121,11 @@ class GestureConsumer(AsyncWebsocketConsumer):
                             await self.processing_task
                         except asyncio.CancelledError:
                             pass
+                    print("Starting clip processing task")
                     self.processing_task = asyncio.create_task(self.process_clip())
                     self.frame_queue = []
             except Exception as e:
-                logger.error(f"Error processing image: {e}")
+                print(f"Error processing image: {e}")
                 await self.send(text_data=json.dumps({'error': f'Image processing failed: {str(e)}'}))
 
     def process_keypoints(self, image):
@@ -149,7 +144,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
 
     async def process_clip(self):
         """Process a clip of frames and keypoints through the model."""
-        logger.info("Processing clip")
+        print("Processing clip")
         start_time = time.time()
 
         frames = self.frame_queue[:FRAMES_PER_CLIP]
@@ -164,14 +159,14 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 inference_start = time.time()
                 outputs = self.model(clip, joint_stream)
                 inference_time = time.time() - inference_start
-                logger.info(f"Inference completed in {inference_time:.2f} seconds")
+                print(f"Inference completed in {inference_time:.2f} seconds")
 
             final_output = outputs['final_output']
             probs = torch.softmax(final_output, dim=1).squeeze(0).cpu().numpy()
             pred_class = probs.argmax().item()
             pred_label = ACTIONS[pred_class]
             confidence = probs[pred_class].item()
-            logger.info(f"Prediction: {pred_label} with confidence {confidence:.2f}")
+            print(f"Prediction: {pred_label} with confidence {confidence:.2f}")
 
             debug_info = {}
             for key, output in outputs.items():
@@ -181,6 +176,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
                     debug_info[key] = str(output.shape)
 
             latency = time.time() - self.last_frame_time
+            print(f"Total clip processing latency: {latency:.2f} seconds")
 
             result = {
                 'prediction': pred_label,
@@ -190,5 +186,5 @@ class GestureConsumer(AsyncWebsocketConsumer):
             }
             await self.send(text_data=json.dumps(result))
         except Exception as e:
-            logger.error(f"Inference failed: {e}")
+            print(f"Inference failed: {e}")
             await self.send(text_data=json.dumps({'error': f'Inference failed: {str(e)}'}))
