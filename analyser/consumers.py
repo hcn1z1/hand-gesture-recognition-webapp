@@ -11,7 +11,6 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 from asgiref.sync import sync_to_async
 import mediapipe as mp
-from .model import C3DImproved # Import your C3DImprovedPreview model
 from torchvision import transforms
 
 # Initialize MediaPipe
