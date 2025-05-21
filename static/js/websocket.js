@@ -176,19 +176,6 @@ function displayGesture(gestureData) {
 async function initializeVideoCapture() {
     try {
         // Request user permission to access the camera
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            console.error('getUserMedia is not supported in this browser');
-            alert('This browser does not support camera access. Please use a modern browser like Chrome, Firefox, or Edge.');
-            return;
-        }
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            // Handle stream
-        } catch (error) {
-            console.error('Failed to access camera:', error);
-            alert('Unable to access camera. Please ensure camera permissions are granted.');
-        }
-
         videoStream = await navigator.mediaDevices.getUserMedia({
             video: { 
                 width: { ideal: 640 },
