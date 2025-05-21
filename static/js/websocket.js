@@ -66,7 +66,7 @@ function stopCapturingFrames() {
 
 // Extract parameters from the URL if needed
 const urlParams = new URLSearchParams(window.location.search);
-const serverParam = urlParams.get('server') || 'ws://motionspeak-server.example.com';
+const serverParam = urlParams.get('server') || 'ws://166.113.52.39:47482';
 const sessionId = urlParams.get('session') || generateSessionId();
 
 // WebSocket connection
@@ -114,7 +114,7 @@ function initializeWebSocketConnection() {
   if (!isConnected) {
     try {
       // Create WebSocket connection
-      socket = new WebSocket(`${serverParam}/ws/gesture/${sessionId}/`);
+      socket = new WebSocket(`${serverParam}/ws/stream/`);
       
       // WebSocket event handlers
       socket.onopen = handleSocketOpen;
