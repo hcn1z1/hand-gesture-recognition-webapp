@@ -88,26 +88,23 @@ class GestureConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({'message': 'WebSocket disconnected'}))
 
     async def receive(self, text_data=None, bytes_data=None):
-        print("Received data")
-        if bytes_data:
+        print(f"Received data - text_data: {text_data[:30] if text_data else None}, bytes_data: {bytes_data[:30] if bytes_data else None}")
+        if text_data:
             try:
                 start_time = time.time()
-                print("Decoding image data")
-                image_data = base64.b64decode(bytes_data)
-                decode_time = time.time() - start_time
-                print(f"Image data decoded in {decode_time:.2f} seconds")
+                # Decode base64 string from text_data
+                image_data = base64.b64decode(text_data)
                 image = Image.open(io.BytesIO(image_data)).convert('RGB')
                 decode_time = time.time() - start_time
                 print(f"Image decoded in {decode_time:.2f} seconds")
 
                 # Transform image
-                print("Transforming image")
                 start_time = time.time()
                 image_tensor = transform(image).to(self.device)
                 transform_time = time.time() - start_time
                 print(f"Image transformed in {transform_time:.2f} seconds")
                 self.frame_queue.append(image_tensor)
-                print(f"Frame queue size: {len(self.frame_queue)}")
+
                 # Record time of last frame
                 self.last_frame_time = time.time()
 
@@ -132,8 +129,8 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 print(f"Error processing image: {e}")
                 await self.send(text_data=json.dumps({'error': f'Image processing failed: {str(e)}'}))
         else:
-            print("Received non-image data, ignoring")
-            print(type(text_data),text_data[:50])
+            print("No text_data received")
+
     def process_keypoints(self, image):
         """Extract keypoints using MediaPipe."""
         image_np = np.array(image)
