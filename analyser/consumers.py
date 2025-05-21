@@ -204,6 +204,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 'latency': latency,
                 'debug_info': debug_info
             }
+            print(f"Sending result: {result}")
             await self.send(text_data=json.dumps(result))
         except Exception as e:
             print(f"Inference failed: {e}")
