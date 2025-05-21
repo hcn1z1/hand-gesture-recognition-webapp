@@ -120,8 +120,6 @@ class GestureConsumer(AsyncWebsocketConsumer):
                     clip_data = self.frame_queue[:self.max_frames]
                     frames = clip_data[0::2]  # Image tensors (0, 2, 4, ...)
                     keypoints_list = clip_data[1::2]  # Keypoints (1, 3, 5, ...)
-                    # Remove processed elements from queue
-                    self.frame_queue = self.frame_queue[self.max_frames:]
                     # Cancel any ongoing task
                     if self.processing_task is not None and not self.processing_task.done():
                         self.processing_task.cancel()
@@ -131,6 +129,8 @@ class GestureConsumer(AsyncWebsocketConsumer):
                             pass
                     print("Starting clip processing task")
                     self.processing_task = asyncio.create_task(self.process_clip(frames, keypoints_list))
+                    # Empty the queue entirely
+                    self.frame_queue = []
             except Exception as e:
                 print(f"Error processing image: {e}")
                 await self.send(text_data=json.dumps({'error': f'Image processing failed: {str(e)}'}))
@@ -197,15 +197,14 @@ class GestureConsumer(AsyncWebsocketConsumer):
             latency = time.time() - self.last_frame_time
             print(f"Total clip processing latency: {latency:.2f} seconds")
 
-            # Send result
+            # Send result with 'type': 'info'
             result = {
-                "type": "info",
+                'type': 'info',
                 'prediction': pred_label,
                 'confidence': float(confidence),
                 'latency': latency,
                 'debug_info': debug_info
             }
-            print(f"Sending result: {result}")
             await self.send(text_data=json.dumps(result))
         except Exception as e:
             print(f"Inference failed: {e}")

@@ -1,6 +1,28 @@
 /**
  * Start capturing and sending video frames
  */
+
+const gestureIcons = {
+      "Open Hand": "fa-hand-paper",
+      "Closed Fist": "fa-hand-rock",
+      "Thumb Up": "fa-thumbs-up",
+      "Thumb Down": "fa-thumbs-down",
+      "Peace Sign": "fa-hand-peace",
+      "Pointing": "fa-hand-point-up",
+      "Spock": "fa-hand-spock",
+      "Stop Sign": "fa-ban",
+      "Swiping Up": "fa-arrow-up",
+      "Swiping Down": "fa-arrow-down",
+      "Swiping Left": "fa-arrow-left",
+      "Swiping Right": "fa-arrow-right",
+      "Shaking Hand": "fa-arrows-up-down",
+      "Hand Clockwise": "fa-rotate-right",
+      "Hand Counterclockwise": "fa-rotate-left",
+      "Rolling Hand Forward": "fa-caret-up",
+      "Rolling Hand Backward": "fa-caret-down",
+      "No Gesture": "fa-ellipsis-h"
+};
+
 function startCapturingFrames() {
   if (isCapturing) return;
   
