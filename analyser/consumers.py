@@ -92,18 +92,22 @@ class GestureConsumer(AsyncWebsocketConsumer):
         if bytes_data:
             try:
                 start_time = time.time()
+                print("Decoding image data")
                 image_data = base64.b64decode(bytes_data)
+                decode_time = time.time() - start_time
+                print(f"Image data decoded in {decode_time:.2f} seconds")
                 image = Image.open(io.BytesIO(image_data)).convert('RGB')
                 decode_time = time.time() - start_time
                 print(f"Image decoded in {decode_time:.2f} seconds")
 
                 # Transform image
+                print("Transforming image")
                 start_time = time.time()
                 image_tensor = transform(image).to(self.device)
                 transform_time = time.time() - start_time
                 print(f"Image transformed in {transform_time:.2f} seconds")
                 self.frame_queue.append(image_tensor)
-
+                print(f"Frame queue size: {len(self.frame_queue)}")
                 # Record time of last frame
                 self.last_frame_time = time.time()
 
