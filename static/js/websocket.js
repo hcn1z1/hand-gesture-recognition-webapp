@@ -536,10 +536,6 @@ function handleConnectionFailure(message) {
     if (legendBox) legendBox.classList.remove('active');
     
     // Reset emoji display
-    if (emojiDisplay) {
-      emojiDisplay.innerHTML = '<div class="emoji-placeholder">Gesture emoji</div>';
-      emojiDisplay.classList.remove('active');
-    }
     
     // Show an error message to the user
   }
@@ -602,27 +598,6 @@ window.addEventListener('beforeunload', () => {
     }
     
     // Function to display a gesture in the emoji display
-    function displayGesture(gestureName) {
-      const iconClass = gestureIcons[gestureName];
-      if (iconClass) {
-        emojiDisplay.innerHTML = `
-          <div class="emoji-icon">
-            <i class="fas ${iconClass}"></i>
-          </div>
-          <div class="emoji-label">${gestureName}</div>
-        `;
-        emojiDisplay.classList.add('active');
-        
-        // Add to history if detection is active
-        if (videoPlaceholder.classList.contains('video-active')) {
-          addGestureToHistory(gestureName);
-        }
-      } else {
-        emojiDisplay.innerHTML = '<div class="emoji-placeholder">Gesture emoji</div>';
-        emojiDisplay.classList.remove('active');
-      }
-    }
-    
     // Function to add a gesture to history
     // Function to update the history list in the UI
     // Check for mobile devices
