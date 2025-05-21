@@ -79,6 +79,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({'message': 'WebSocket connected'}))
 
     async def disconnect(self, close_code):
+        print(f"WebSocket disconnected with code: {close_code}")
         await self.send(text_data=json.dumps({'message': 'WebSocket disconnected'}))
         pose.close()
         hands.close()
