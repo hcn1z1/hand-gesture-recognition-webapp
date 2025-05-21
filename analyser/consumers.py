@@ -46,6 +46,7 @@ label2id = {action: idx for idx, action in enumerate(ACTIONS)}
 
 # Set up logging
 logger = logging.getLogger('GestureConsumer')
+logger.setLevel(logging.INFO)
 
 def extract_keypoints(pose_landmarks, left_hand_landmarks, right_hand_landmarks):
     """Extract keypoints from pose and hand landmarks."""
