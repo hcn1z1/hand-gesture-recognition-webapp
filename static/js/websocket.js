@@ -541,7 +541,6 @@ function handleConnectionFailure(message) {
     }
     
     // Show an error message to the user
-    alert(`Connection Error: ${message} Please try again later.`);
   }
 }
 
@@ -629,60 +628,6 @@ window.addEventListener('beforeunload', () => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     
     // Start button click handler
-    startButton.addEventListener('click', function(e) {
-      // Ripple effect
-      const ripple = document.createElement('span');
-      ripple.classList.add('ripple');
-      
-      const rect = this.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      
-      ripple.style.left = x + 'px';
-      ripple.style.top = y + 'px';
-      
-      this.appendChild(ripple);
-      
-      setTimeout(() => {
-        ripple.remove();
-      }, 600);
-      
-      // Toggle video active state
-      if (videoPlaceholder.classList.contains('video-active')) {
-        videoPlaceholder.classList.remove('video-active');
-        startButton.textContent = 'Start Detection';
-        legendBox.classList.remove('active');
-        
-        // Reset emoji display
-        emojiDisplay.innerHTML = '<div class="emoji-placeholder">Gesture emoji</div>';
-        emojiDisplay.classList.remove('active');
-        
-        // Clear the demo interval
-        if (window.demoInterval) {
-          clearInterval(window.demoInterval);
-        }
-      } else {
-        videoPlaceholder.classList.add('video-active');
-        startButton.textContent = 'Stop Detection';
-        // Show legend box with a slight delay
-        setTimeout(() => {
-          legendBox.classList.add('active');
-          
-          // For demo purposes, show a random gesture icon when detection starts
-          const gestures = Object.keys(gestureIcons);
-          const randomGesture = gestures[Math.floor(Math.random() * gestures.length)];
-          displayGesture(randomGesture);
-          
-          // Set up a demo interval to show different gestures (for demonstration only)
-          window.demoInterval = setInterval(() => {
-            const gestures = Object.keys(gestureIcons);
-            const randomGesture = gestures[Math.floor(Math.random() * gestures.length)];
-            displayGesture(randomGesture);
-          }, 3000);
-        }, 300);
-      }
-    });
-    
     // Sidebar toggle handler
     sidebarToggle.addEventListener('click', function() {
       sidebarContainer.classList.toggle('open');
