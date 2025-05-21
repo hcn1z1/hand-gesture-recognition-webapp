@@ -18,13 +18,20 @@ function startCapturingFrames() {
     
     // Get the frame data as a blob
     captureCanvas.toBlob((blob) => {
-      if (blob && socket && socket.readyState === WebSocket.OPEN) {
-        // Send the frame data through the WebSocket
-        socket.send(blob);
-      }
+        if (blob && socket && socket.readyState === WebSocket.OPEN) {
+            // Convert Blob to base64
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                // reader.result is a base64 string (e.g., "data:image/jpeg;base64,...")
+                // Remove the data URI prefix to send only the base64 data
+                const base64String = reader.result.split(',')[1];
+                socket.send(base64String);
+            };
+            reader.readAsDataURL(blob); // Convert Blob to base64
+        }
     }, 'image/jpeg', 0.7); // Use JPEG with 70% quality for better compression
-    
-  }, frameDelay);
+
+}, frameDelay);
 }
 
 /**
