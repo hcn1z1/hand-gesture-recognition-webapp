@@ -157,6 +157,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
     async def process_clip(self, frames, keypoints_list):
         """Process a clip of frames and keypoints through the model."""
         start_time = time.time()
+        self.frame_queue = []  # Clear the queue to prevent further processing
         try:
             # Stack frames and keypoints
             clip = torch.stack(frames).unsqueeze(0)  # [1, T, C, H, W]
