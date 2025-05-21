@@ -88,6 +88,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
         await self.send(text_data=json.dumps({'message': 'WebSocket disconnected'}))
 
     async def receive(self, text_data=None, bytes_data=None):
+        print(f"Received data - text_data: {text_data[:30] if text_data else None}, bytes_data: {bytes_data[:30] if bytes_data else None}")
         if text_data:
             try:
                 start_time = time.time()
@@ -115,6 +116,13 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 self.frame_queue.append(keypoints)
 
                 if len(self.frame_queue) >= self.max_frames:
+                    # Extract frames and keypoints
+                    clip_data = self.frame_queue[:self.max_frames]
+                    frames = clip_data[0::2]  # Image tensors (0, 2, 4, ...)
+                    keypoints_list = clip_data[1::2]  # Keypoints (1, 3, 5, ...)
+                    # Remove processed elements from queue
+                    self.frame_queue = self.frame_queue[self.max_frames:]
+                    # Cancel any ongoing task
                     if self.processing_task is not None and not self.processing_task.done():
                         self.processing_task.cancel()
                         try:
@@ -122,8 +130,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
                         except asyncio.CancelledError:
                             pass
                     print("Starting clip processing task")
-                    self.processing_task = asyncio.create_task(self.process_clip())
-                    self.frame_queue = []
+                    self.processing_task = asyncio.create_task(self.process_clip(frames, keypoints_list))
             except Exception as e:
                 print(f"Error processing image: {e}")
                 await self.send(text_data=json.dumps({'error': f'Image processing failed: {str(e)}'}))
@@ -144,32 +151,33 @@ class GestureConsumer(AsyncWebsocketConsumer):
         )
         return torch.tensor(keypoints, dtype=torch.float32).to(self.device)
 
-    async def process_clip(self):
+    async def process_clip(self, frames, keypoints_list):
         """Process a clip of frames and keypoints through the model."""
         print("Processing clip")
         start_time = time.time()
 
-        frames = self.frame_queue[:FRAMES_PER_CLIP]
-        keypoints = self.frame_queue[FRAMES_PER_CLIP:FRAMES_PER_CLIP * 2]
-
-        clip = torch.stack(frames).unsqueeze(0)
-        clip = clip.permute(0, 2, 1, 3, 4)
-        joint_stream = torch.stack(keypoints).unsqueeze(0)
-
         try:
+            # Stack frames and keypoints
+            clip = torch.stack(frames).unsqueeze(0)  # [1, T, C, H, W]
+            clip = clip.permute(0, 2, 1, 3, 4)  # [1, C, T, H, W]
+            joint_stream = torch.stack(keypoints_list).unsqueeze(0)  # [1, T, 48, 3]
+
+            # Run inference
             with torch.no_grad():
                 inference_start = time.time()
                 outputs = self.model(clip, joint_stream)
                 inference_time = time.time() - inference_start
                 print(f"Inference completed in {inference_time:.2f} seconds")
 
-            final_output = outputs['final_output']
+            # Extract final prediction
+            final_output = outputs['final_output']  # [1, 18]
             probs = torch.softmax(final_output, dim=1).squeeze(0).cpu().numpy()
             pred_class = probs.argmax().item()
             pred_label = ACTIONS[pred_class]
             confidence = probs[pred_class].item()
             print(f"Prediction: {pred_label} with confidence {confidence:.2f}")
 
+            # Debug info
             debug_info = {}
             for key, output in outputs.items():
                 if torch.isnan(output).any() or torch.isinf(output).any():
@@ -177,9 +185,11 @@ class GestureConsumer(AsyncWebsocketConsumer):
                 else:
                     debug_info[key] = str(output.shape)
 
+            # Calculate latency
             latency = time.time() - self.last_frame_time
             print(f"Total clip processing latency: {latency:.2f} seconds")
 
+            # Send result
             result = {
                 'prediction': pred_label,
                 'confidence': float(confidence),
