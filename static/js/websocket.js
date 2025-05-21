@@ -2,6 +2,17 @@
  * Start capturing and sending video frames
  */
 
+
+const sidebarContainer = document.getElementById('sidebarContainer');
+const sidebarToggle = document.getElementById('sidebarToggle');
+const toggleIcon = document.getElementById('toggleIcon');
+const historyPanel = document.getElementById('historyPanel');
+const historyToggle = document.getElementById('historyToggle');
+const historyToggleIcon = document.getElementById('historyToggleIcon');
+    
+    // Gesture history array
+    let gestureHistory = [];
+
 const gestureIcons = {
     "Doing other things": "fa-ellipsis-h", // Placeholder
     "No gesture": "fa-ellipsis-h",
@@ -230,13 +241,8 @@ async function initializeVideoCapture() {
         }
         videoStream = await navigator.mediaDevices.getUserMedia({
             video: { 
-                deviceId: videoDevices.length > 0 ? videoDevices[0].deviceId : undefined,
                 facingMode: "user", // Use the front camera if available
-                width: { ideal: 640 },
-                height: { ideal: 480 },
-                frameRate: { ideal: 30 }
             },
-            audio: false
         });
         
         console.log('Camera access granted');
@@ -413,46 +419,6 @@ function handleSocketOpen(event) {
 /**
  * Handle WebSocket message event
  */
-function handleSocketMessage(event) {
-  try {
-    // Check if the message is binary (not used in this implementation)
-    if (event.data instanceof Blob) {
-      console.log('Received binary data from server');
-      return;
-    }
-    
-    // Parse the JSON message
-    const data = JSON.parse(event.data);
-    
-    switch (data.type) {
-      case "connected":
-        // Connection acknowledgment - do nothing as specified
-        console.log('Server acknowledged connection');
-        break;
-        
-      case "info":
-        // Process gesture information from the server
-        if (data.gesture) {
-          // Display the gesture in the emoji box
-          displayGesture(data.gesture);
-          
-          // If detection is active, this will automatically add to history
-          // The displayGesture function in po.html already handles this logic
-        }
-        
-        // Update additional info if available
-        if (data.stats) {
-          updatePerformanceStats(data.stats);
-        }
-        break;
-        
-      default:
-        console.log('Received unknown message type:', data.type);
-    }
-  } catch (error) {
-    console.error('Error processing WebSocket message:', error);
-  }
-}
 
 /**
  * Handle WebSocket close event
@@ -615,3 +581,213 @@ window.addEventListener('beforeunload', () => {
   closeWebSocketConnection();
 });
     // Gesture history array
+
+
+
+
+
+
+
+
+
+
+
+    // Function to format the time nicely
+    function formatTime(date) {
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const seconds = date.getSeconds().toString().padStart(2, '0');
+      const milliseconds = date.getMilliseconds().toString().padStart(3, '0');
+      return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+    }
+    
+    // Function to display a gesture in the emoji display
+    function displayGesture(gestureName) {
+      const iconClass = gestureIcons[gestureName];
+      if (iconClass) {
+        emojiDisplay.innerHTML = `
+          <div class="emoji-icon">
+            <i class="fas ${iconClass}"></i>
+          </div>
+          <div class="emoji-label">${gestureName}</div>
+        `;
+        emojiDisplay.classList.add('active');
+        
+        // Add to history if detection is active
+        if (videoPlaceholder.classList.contains('video-active')) {
+          addGestureToHistory(gestureName);
+        }
+      } else {
+        emojiDisplay.innerHTML = '<div class="emoji-placeholder">Gesture emoji</div>';
+        emojiDisplay.classList.remove('active');
+      }
+    }
+    
+    // Function to add a gesture to history
+    // Function to update the history list in the UI
+    // Check for mobile devices
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    // Start button click handler
+    startButton.addEventListener('click', function(e) {
+      // Ripple effect
+      const ripple = document.createElement('span');
+      ripple.classList.add('ripple');
+      
+      const rect = this.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      ripple.style.left = x + 'px';
+      ripple.style.top = y + 'px';
+      
+      this.appendChild(ripple);
+      
+      setTimeout(() => {
+        ripple.remove();
+      }, 600);
+      
+      // Toggle video active state
+      if (videoPlaceholder.classList.contains('video-active')) {
+        videoPlaceholder.classList.remove('video-active');
+        startButton.textContent = 'Start Detection';
+        legendBox.classList.remove('active');
+        
+        // Reset emoji display
+        emojiDisplay.innerHTML = '<div class="emoji-placeholder">Gesture emoji</div>';
+        emojiDisplay.classList.remove('active');
+        
+        // Clear the demo interval
+        if (window.demoInterval) {
+          clearInterval(window.demoInterval);
+        }
+      } else {
+        videoPlaceholder.classList.add('video-active');
+        startButton.textContent = 'Stop Detection';
+        // Show legend box with a slight delay
+        setTimeout(() => {
+          legendBox.classList.add('active');
+          
+          // For demo purposes, show a random gesture icon when detection starts
+          const gestures = Object.keys(gestureIcons);
+          const randomGesture = gestures[Math.floor(Math.random() * gestures.length)];
+          displayGesture(randomGesture);
+          
+          // Set up a demo interval to show different gestures (for demonstration only)
+          window.demoInterval = setInterval(() => {
+            const gestures = Object.keys(gestureIcons);
+            const randomGesture = gestures[Math.floor(Math.random() * gestures.length)];
+            displayGesture(randomGesture);
+          }, 3000);
+        }, 300);
+      }
+    });
+    
+    // Sidebar toggle handler
+    sidebarToggle.addEventListener('click', function() {
+      sidebarContainer.classList.toggle('open');
+      
+      if (sidebarContainer.classList.contains('open')) {
+        toggleIcon.classList.remove('fa-chevron-right');
+        toggleIcon.classList.add('fa-chevron-left');
+      } else {
+        toggleIcon.classList.remove('fa-chevron-left');
+        toggleIcon.classList.add('fa-chevron-right');
+      }
+    });
+    
+    // History panel toggle handler
+    historyToggle.addEventListener('click', function() {
+      historyPanel.classList.toggle('open');
+      
+      if (historyPanel.classList.contains('open')) {
+        historyToggleIcon.classList.remove('fa-chevron-right');
+        historyToggleIcon.classList.add('fa-chevron-left');
+      } else {
+        historyToggleIcon.classList.remove('fa-chevron-left');
+        historyToggleIcon.classList.add('fa-chevron-right');
+      }
+    });
+    
+    // Initialize UI based on screen size
+    window.addEventListener('DOMContentLoaded', () => {
+      if (isMobile) {
+        // Mobile layout
+        toggleIcon.classList.remove('fa-chevron-left');
+        toggleIcon.classList.add('fa-chevron-down');
+        historyToggleIcon.classList.remove('fa-chevron-left', 'fa-chevron-right');
+        historyToggleIcon.classList.add('fa-chevron-up');
+      } else {
+        // Desktop layout - sidebar visible by default
+        sidebarContainer.classList.add('open');
+        historyPanel.classList.add('open');
+      }
+      
+      // Initialize history list
+      updateHistoryList();
+    });
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      if (window.innerWidth <= 768) {
+        // Mobile layout
+        toggleIcon.classList.remove('fa-chevron-left', 'fa-chevron-right');
+        historyToggleIcon.classList.remove('fa-chevron-left', 'fa-chevron-right');
+        
+        if (sidebarContainer.classList.contains('open')) {
+          toggleIcon.classList.add('fa-chevron-down');
+        } else {
+          toggleIcon.classList.add('fa-chevron-up');
+        }
+        
+        if (historyPanel.classList.contains('open')) {
+          historyToggleIcon.classList.add('fa-chevron-down');
+        } else {
+          historyToggleIcon.classList.add('fa-chevron-up');
+        }
+      } else {
+        // Desktop layout
+        toggleIcon.classList.remove('fa-chevron-up', 'fa-chevron-down');
+        historyToggleIcon.classList.remove('fa-chevron-up', 'fa-chevron-down');
+        
+        if (sidebarContainer.classList.contains('open')) {
+          toggleIcon.classList.add('fa-chevron-left');
+        } else {
+          toggleIcon.classList.add('fa-chevron-right');
+        }
+        
+        if (historyPanel.classList.contains('open')) {
+          historyToggleIcon.classList.add('fa-chevron-left');
+        } else {
+          historyToggleIcon.classList.add('fa-chevron-right');
+        }
+      }
+    });
+
+    // Click on gesture items to preview them in the emoji display
+    document.querySelectorAll('.gesture-item').forEach(item => {
+      item.addEventListener('click', function() {
+        if (videoPlaceholder.classList.contains('video-active')) {
+          const gestureName = this.getAttribute('data-gesture');
+          displayGesture(gestureName);
+          
+          // Clear any existing demo interval
+          if (window.demoInterval) {
+            clearInterval(window.demoInterval);
+          }
+        }
+      });
+    });
+
+    // Support for dark/light mode
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.classList.add('dark');
+    }
+    
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+      if (event.matches) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    });
