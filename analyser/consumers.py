@@ -199,6 +199,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
 
             # Send result
             result = {
+                "type": "info",
                 'prediction': pred_label,
                 'confidence': float(confidence),
                 'latency': latency,
