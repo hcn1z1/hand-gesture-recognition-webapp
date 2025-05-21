@@ -190,6 +190,7 @@ class GestureConsumer(AsyncWebsocketConsumer):
 
             # Debug info
             debug_info = {}
+            self.frame_queue = []  # Clear the queue after processing
             if isinstance(outputs, dict):
                 for key, output in outputs.items():
                     if torch.isnan(output).any() or torch.isinf(output).any():

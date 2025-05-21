@@ -338,6 +338,7 @@ function handleSocketMessage(event) {
         }
         
         // Parse the JSON message
+        emojiDisplay.innerHTML = String(event.data); // Clear previous content
         const data = JSON.parse(event.data);
         console.log('Received message from server:', data);
         // Check if the data contains prediction information directly
