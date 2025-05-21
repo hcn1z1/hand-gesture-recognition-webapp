@@ -10,7 +10,6 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 import mediapipe as mp
 from torchvision import transforms
-import concurrent.futures
 
 # Initialize MediaPipe
 mp_pose = mp.solutions.pose
@@ -76,7 +75,6 @@ class GestureConsumer(AsyncWebsocketConsumer):
         self.model.eval()
         load_time = time.time() - start_time
         print(f"Model loaded in {load_time:.2f} seconds")
-        self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=1)
 
     async def connect(self):
         await self.accept()
@@ -88,7 +86,6 @@ class GestureConsumer(AsyncWebsocketConsumer):
         if self.processing_task is not None:
             self.processing_task.cancel()
         self.frame_queue = []  # Clear queue on disconnect
-        self.executor.shutdown(wait=False)  # Shutdown executor
         await self.send(text_data=json.dumps({'message': 'WebSocket disconnected', 'type': 'info'}))
 
     async def receive(self, text_data=None, bytes_data=None):
@@ -172,11 +169,10 @@ class GestureConsumer(AsyncWebsocketConsumer):
             joint_stream = torch.stack(keypoints_list).unsqueeze(0)  # [1, T, 48, 3]
             print(f"Clip shape: {clip.shape}, Joint stream shape: {joint_stream.shape}")
 
-            # Run inference in a separate process
-            loop = asyncio.get_event_loop()
+            # Run inference directly
             with torch.no_grad():
                 inference_start = time.time()
-                outputs = await loop.run_in_executor(self.executor, lambda: self.model(clip, joint_stream))
+                outputs = self.model(clip, joint_stream)
                 inference_time = time.time() - inference_start
                 print(f"Inference completed in {inference_time:.2f} seconds")
 
